@@ -3,7 +3,7 @@ module Syntax where
 type Name = String
 type Indirection = Int
 
-data Variable = Variable Name Type
+data Symbol = Symbol Name Type
      deriving (Eq, Show)
 
 data Type = Type PrimType Indirection
@@ -15,8 +15,9 @@ data PrimType = Int
 
 data Expr
      = BinOp Name Expr Expr
-     | FuncDef Name Type [Variable] [Expr]
+     | FuncDef Name Type [Symbol] [Expr]
      | FuncCall Name [Expr]
+     | VariableDecl Symbol
      | If Expr [Expr]
      | Const Integer
      | Assignment Expr Expr

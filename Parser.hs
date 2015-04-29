@@ -6,6 +6,7 @@ module Parser where
 
 import Numeric
 import Control.Monad
+import Control.Applicative ((<$>))
 import Data.Char
 
     
@@ -126,6 +127,7 @@ statement =   selectionStatement
           <|> jumpStatement
           <|> expressionStatement
           <|> assignment
+          <|> variableDeclaration
 
 statements :: Parser [Expr]
 --statements = statement `sepEndBy` semi
@@ -161,11 +163,14 @@ ifClause = do
          body <- braces statements
          return $ If cond body
 
-variable :: Parser Variable
+variableDeclaration :: Parser Expr
+variableDeclaration = VariableDecl <$> variable
+
+variable :: Parser Symbol
 variable = do
          typ <- fullType
          name <- identifier
-         return $ Variable name typ
+         return $ Symbol name typ
 
 primType :: Parser PrimType
 primType = reserved "int" >> return Int
