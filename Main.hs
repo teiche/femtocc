@@ -3,8 +3,10 @@ module Main where
 import System.Environment
 
 import Text.ParserCombinators.Parsec
-
+    
 import Parser
+import SADeclaration
+
 -- UNCOMMENT FOR REPL-like THING
 {- 
 import Control.Monad.Trans
@@ -32,4 +34,6 @@ main = do
      
      ast <- parseFromFile program (args !! 0)
 
+     print $ fmap checkDeclarations ast
+            
      print ast

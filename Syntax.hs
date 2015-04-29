@@ -6,6 +6,9 @@ type Indirection = Int
 data Symbol = Symbol Name Type
      deriving (Eq, Show)
 
+symbolName :: Symbol -> String
+symbolName (Symbol name _) = name
+              
 data Type = Type PrimType Indirection
      deriving (Eq, Show)
 
