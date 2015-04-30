@@ -1,5 +1,7 @@
 module Syntax where
 
+import Data.Function
+    
 type Name = String
 type Indirection = Int
 
@@ -7,8 +9,12 @@ data Symbol = Symbol Name Type
      deriving (Eq, Show)
 
 symbolName :: Symbol -> String
-symbolName (Symbol name _) = name
-              
+symbolName (Symbol name _) = name              
+
+-- Because C is generally type-unsafe, two symbols are equal if their names are equal
+--instance Eq Symbol where
+--    (==) = (==) `on` symbolName
+
 data Type = Type PrimType Indirection
      deriving (Eq, Show)
 
