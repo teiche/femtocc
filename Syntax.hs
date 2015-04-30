@@ -11,10 +11,6 @@ data Symbol = Symbol Name Type
 symbolName :: Symbol -> String
 symbolName (Symbol name _) = name              
 
--- Because C is generally type-unsafe, two symbols are equal if their names are equal
---instance Eq Symbol where
---    (==) = (==) `on` symbolName
-
 data Type = Type PrimType Indirection
      deriving (Eq, Show)
 
