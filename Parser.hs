@@ -151,7 +151,7 @@ jumpStatement = do
               return $ Return result
           
 expressionStatement :: Parser Expr
-expressionStatement = (semi >> return Nop) <|> do
+expressionStatement = (semi >> return Pass) <|> do
                     val <- expr
                     semi
                     return val

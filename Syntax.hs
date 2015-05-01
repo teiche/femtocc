@@ -28,5 +28,5 @@ data Expr
      | Assignment Expr Expr
      | Identifier Name
      | Return (Maybe Expr)
-     | Nop
+     | Pass
      deriving (Eq, Show)
