@@ -50,6 +50,7 @@ emitASM (Pop r@Reg{})  = Right $ "pop " ++ (show r)
 emitASM (Add rd@Reg{} rs@Reg{}) = Right $ "add " ++ (show rd) ++ ", " ++ (show rs)
 emitASM (Sub rd@Reg{} rs@Reg{}) = Right $ "sub " ++ (show rd) ++ ", " ++ (show rs)
 emitASM (Mov rd@Reg{} i@Imm{})  = Right $ "mov " ++ (show rd) ++ ", " ++ (show i)
+emitASM Nop                     = Right "nop"
 emitASM instr = Left $ "Undefined Instruction: " ++ (show instr)
 
 compileAST = (fmap emitASM) . codeGen
