@@ -5,6 +5,8 @@ import Data.Function
 type Name = String
 type Indirection = Int
 
+type SymbolName = Name
+    
 data Symbol = Symbol Name Type
      deriving (Eq, Show)
 
@@ -24,7 +26,7 @@ data Expr
      | FuncCall Name [Expr]
      | VariableDecl Symbol
      | If Expr [Expr]
-     | Const Integer
+     | Const Int
      | Assignment Expr Expr
      | Identifier Name
      | Return (Maybe Expr)

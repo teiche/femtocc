@@ -25,10 +25,10 @@ visible st name = name `elem` visibleNames
 inTopScope :: SymbolTable -> Symbol -> Bool
 inTopScope st sym = sym `elem` (head st)
     
--- Given a symbol, look it up in the symbol table    
+-- Given a symbol, look it up in the symbol table
+-- TODO: Switch to find from listToMaybe $ filter
 getBySymbol :: SymbolTable -> Symbol -> Maybe Symbol
 getBySymbol st sym = listToMaybe $ filter (((==) `on` symbolName) sym) (head st)
-
 
                      
 -- Return a list of lists of elements that are duplicates as determined by f
@@ -61,6 +61,7 @@ checkExprDeclarations st (FuncDef _ _ args children) = localErrors ++ (checkDecl
                                                                        (args : st) children)
   where localErrors = errorDuplicates args
 checkExprDeclarations st (FuncCall _ exprs) = checkDeclarations' st exprs
+-- TODO: doesn't detect declarations in the body of a scope
 checkExprDeclarations st (VariableDecl sym) = case (getBySymbol st sym) of
                                                 Nothing -> []
                                                 Just s -> [MultipleDeclarations [sym, s]]

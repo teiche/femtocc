@@ -123,22 +123,24 @@ functionDefinition = do
                    return $ FuncDef name retType arguments body
 
 statement :: Parser Expr
-statement =   selectionStatement
-          <|> jumpStatement
-          <|> expressionStatement
-          <|> assignment
+statement =   (try selectionStatement)
+          <|> (try jumpStatement)
+--          <|> (try assignment)
+          <|> (try expressionStatement)
           <|> variableDeclaration
 
 statements :: Parser [Expr]
 --statements = statement `sepEndBy` semi
 statements = many statement
 
+{-             
 assignment :: Parser Expr
 assignment = do
            lval <- expr
            reservedOp "="
            rval <- expr
            return $ Assignment lval rval
+-}
 
 selectionStatement :: Parser Expr
 selectionStatement = ifClause
@@ -216,7 +218,7 @@ binary = liftM (Const . readBin) $ binaryPrefix >> (many1 binDigit)
              binDigit = oneOf "01"
 
 -- Extract the number from the result of readHex and readOctal
-extractNum :: [(Integer, String)] -> Integer
+extractNum :: [(Int, String)] -> Int
 extractNum = fst . head
 
 readBin :: Integral a => String -> a
