@@ -128,7 +128,10 @@ funcExit f =
 argStackSize :: [Symbol] -> Int
 argStackSize args = length args
 
--- Generate Code!
+---------------------
+-- Code Generation --
+---------------------
+
 codeGen :: Expr -> [ASMStatement]
 codeGen expr = crtm ++ (codeGen' [] expr)
 
@@ -172,6 +175,10 @@ codeGen' fot f@(FuncCall name args) =
     where pushArgs = ((intercalate pushDown) $ map (codeGen' fot) args) ++ pushDown
 codeGen' _ Pass = [Nop]
 codeGen' _ _ = []
+
+--------------------
+-- IR to Assembly --
+--------------------
 
 -- Translate the assembly IR returned by codeGen into real assembly
 emitASM :: ASMStatement -> Either String String
