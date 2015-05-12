@@ -1,5 +1,3 @@
---{-# LANGUAGE InstanceSigs #-}
-
 module BEStackMachine where
 
 import Data.List (intercalate)
