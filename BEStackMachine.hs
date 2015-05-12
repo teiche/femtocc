@@ -3,12 +3,12 @@
 module BEStackMachine where
 
 import Data.List (intercalate)
-import Data.Maybe (fromJust)    
+import Data.Maybe (fromJust)
 import Numeric
-    
+
 import Syntax
 import FrameOffsetTable
-    
+
 -- A backend using a stack machine execution model
 
 data Operand = Reg Int
@@ -22,7 +22,7 @@ instance Show Operand where
     show (Label l) = l
     show (Plus r@Reg{} i@Imm{}) = "(" ++ (show r) ++ " + " ++ (show i) ++ ")"
 
--- Comonly used registers                                  
+-- Comonly used registers
 ret = Reg 0 -- Return Value
 cfp = Reg 1 -- Current frame pointer
 acc = Reg 2 -- Accumulator
@@ -31,7 +31,7 @@ tmp = Reg 3 -- Temp
 data ASMStatement = Push Operand
                   | Pop Operand
                   | Add Operand Operand
-                  | Sub Operand Operand                   
+                  | Sub Operand Operand
                   | Mov Operand Operand
                   | Asp Operand
                   | LabelDef String
@@ -44,14 +44,19 @@ data ASMStatement = Push Operand
                   | Nop
                   deriving Show
 
+----------------------------------
+-- Machine specific information --
+----------------------------------
 ramEnd :: Int
 ramEnd = 0x8200
-                          
--- C runtime
+
+---------------
+-- C Runtime --
+---------------
 -- Set up the stack and frame pointers
 -- Jump to main
 -- TODO: Handle this in the linking step
-crtm :: [ASMStatement]                          
+crtm :: [ASMStatement]
 crtm = [
   -- pad out the interrupt vectors with NOPs
   Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop,
@@ -62,16 +67,16 @@ crtm = [
   Mov cfp (Imm 0),
   Brn (Label "main")
   ]
-                          
+
 -- Determine how much a single instruction changes the stack size
 stackChange :: ASMStatement -> Int
 stackChange Push{} = 1
 stackChange Pop{} = -1
 stackChange Call{} = 1
 stackChange Ret{} = -1
-stackChange (Asp (Imm x)) = negate x                    
+stackChange (Asp (Imm x)) = negate x
 stackChange _ = 0
-                
+
 -- Determine how much the stack grows or shrinks after executing a
 -- list of instructions
 -- Positive values are the stack growing
@@ -79,46 +84,51 @@ stackChange _ = 0
 stackDelta :: [ASMStatement] -> Int
 stackDelta = sum . (map stackChange)
 
--- Push the accumulator onto the stack, making room for an expression to be evaluated
-pushDown = [Push acc]
-
-binOpFunc :: String -> Operand -> Operand -> ASMStatement           
-binOpFunc "+" = Add
-binOpFunc "-" = Sub
-binOpFunc x = error $ "Uncrecognized Operator: " ++ x                
-
--- The minimum number of stack words a sequence of expressions will require to execute
-stackSize :: [Expr] -> Int
-stackSize exprs = sum $ map exprSize exprs
-    
+-- The size a given expression requires on the stack ahead of time
 exprSize :: Expr -> Int
 exprSize VariableDecl{} = 1
 exprSize _ = 0
 
--- Make room on the stack
+-- The minimum number of stack words a sequence of expressions will require to execute
+stackSize :: [Expr] -> Int
+stackSize exprs = sum $ map exprSize exprs
+
+-- Push the accumulator onto the stack, making room for an expression to be evaluated
+pushDown = [Push acc]
+
+binOpFunc :: String -> Operand -> Operand -> ASMStatement
+binOpFunc "+" = Add
+binOpFunc "-" = Sub
+binOpFunc x = error $ "Uncrecognized Operator: " ++ x
+
+-- Preallocate room on the stack for any locals declared in the function
 funcAlloc :: Expr -> [ASMStatement]
 funcAlloc (FuncDef _ _ _  body) = [Asp ((Imm . negate . stackSize) body)]
-             
+
+-- Adjust the frame pointer and make room for the new function
 funcEntry :: Expr -> [ASMStatement]
 funcEntry f =
     [Push cfp, -- Save the current frame pointer
      Rsp cfp] ++  -- Calculate the new frame pointer
      funcAlloc f
 
--- Pop the stack frame
+-- Deallocate room on the stack for locals declared in the scope
 funcDealloc :: Expr -> [ASMStatement]
 funcDealloc (FuncDef _ _ _ body) = [Asp ((Imm . stackSize) body)]
-    
+
+-- Deallocate room on the stack for locals, and restore the old frame pointer
 funcExit :: Expr -> [ASMStatement]
 funcExit f =
      funcDealloc f ++
     [Pop cfp,
      Ret]
 
--- Get the stack size required to pass all function arguments    
+-- Get the stack size required to pass all function arguments
+-- TODO: Take into account argument size
 argStackSize :: [Symbol] -> Int
 argStackSize args = length args
 
+-- Generate Code!
 codeGen :: Expr -> [ASMStatement]
 codeGen expr = crtm ++ (codeGen' [] expr)
 
@@ -160,10 +170,10 @@ codeGen' fot f@(FuncCall name args) =
      Asp ((Imm . stackDelta) pushArgs)]
                      -- Evaluate all args, and push them onto the stack
     where pushArgs = ((intercalate pushDown) $ map (codeGen' fot) args) ++ pushDown
-          
 codeGen' _ Pass = [Nop]
 codeGen' _ _ = []
 
+-- Translate the assembly IR returned by codeGen into real assembly
 emitASM :: ASMStatement -> Either String String
 emitASM (Push r@Reg{}) = Right $ "push " ++ (show r)
 emitASM (Pop r@Reg{})  = Right $ "pop " ++ (show r)
