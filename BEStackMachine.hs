@@ -45,6 +45,13 @@ data Instruction = Push Operand
                  | Nop
                  deriving Show
 
+-- C runtime
+-- Set up the stack and frame pointers
+-- Jump to main
+crtm :: [Instruction]                          
+crtm = [
+  ]
+                          
 -- Determine how much a single instruction changes the stack size
 stackChange :: Instruction -> Int
 stackChange Push{} = 1
@@ -53,7 +60,7 @@ stackChange Call{} = 1
 stackChange Ret{} = -1
 stackChange (Asp (Imm x)) = negate x                    
 stackChange _ = 0
-                            
+                
 -- Determine how much the stack grows or shrinks after executing a
 -- list of instructions
 -- Positive values are the stack growing
@@ -76,17 +83,25 @@ stackSize exprs = sum $ map exprSize exprs
 exprSize :: Expr -> Int
 exprSize VariableDecl{} = 1
 exprSize _ = 0
-                  
-funcEntry :: Expr -> [Instruction]
-funcEntry (FuncDef _ _ _ body) =
-    [Push cfp, -- Save the current frame pointer
-     Rsp cfp, -- Calculate the new frame pointer
-     Asp ((Imm . negate . stackSize) body)] -- Make stack room for the function
 
+-- Make room on the stack
+funcAlloc :: Expr -> [Instruction]
+funcAlloc (FuncDef _ _ _  body) = [Asp ((Imm . negate . stackSize) body)]
+             
+funcEntry :: Expr -> [Instruction]
+funcEntry f =
+    [Push cfp, -- Save the current frame pointer
+     Rsp cfp] ++  -- Calculate the new frame pointer
+     funcAlloc f
+
+-- Pop the stack frame
+funcDealloc :: Expr -> [Instruction]
+funcDealloc (FuncDef _ _ _ body) = [Asp ((Imm . stackSize) body)]
+    
 funcExit :: Expr -> [Instruction]
-funcExit (FuncDef _ _ _ body) =
-    [Asp ((Imm . stackSize) body),
-     Pop cfp,
+funcExit f =
+     funcDealloc f ++
+    [Pop cfp,
      Ret]
 
 -- Get the stack size required to pass all function arguments    
@@ -112,6 +127,14 @@ codeGen' fot (BinOp op left right) =
     (codeGen' fot right) ++
     [Pop tmp, binOpFunc op acc tmp]
 codeGen' _   (VariableDecl _) = []
+-- Main is a special case, it doesn't have a frame pointer to restore
+-- or return
+codeGen' [] f@(FuncDef "main" _ args body) =
+    [LabelDef "main"] ++
+     funcAlloc f ++
+     (concatMap (codeGen' (generateFunctionOffset f)) body) ++
+     funcDealloc f++
+    [LabelDef ("DBG_" ++ "main" ++ "_end")]
 codeGen' [] f@(FuncDef name _ args body) =
     [LabelDef name] ++
      funcEntry f ++
@@ -124,11 +147,11 @@ codeGen' fot f@(FuncCall name args) =
     [Call (Label name),
     -- Clean up the stack after returning
      Asp ((Imm . stackDelta) pushArgs)]
-                      -- Evaluate all args, and push them onto the stack
+                     -- Evaluate all args, and push them onto the stack
     where pushArgs = ((intercalate pushDown) $ map (codeGen' fot) args) ++ pushDown
           
 codeGen' _ Pass = [Nop]
-codeGen' _ _ = []    
+codeGen' _ _ = []
 
 emitASM :: Instruction -> Either String String
 emitASM (Push r@Reg{}) = Right $ "push " ++ (show r)
@@ -139,9 +162,9 @@ emitASM (Mov rd@Reg{} i@Imm{})  = Right $ "mov " ++ (show rd) ++ ", " ++ (show i
 emitASM (Asp i@Imm{})           = Right $ "asp " ++ (show i)
 emitASM (Store src@Reg{} dest@Reg{}) = Right $ "st " ++ (show src) ++ ", " ++ (show dest)
 emitASM (Store src@Reg{} dest@(Plus Reg{} Imm{})) = Right $ "st " ++ (show src) ++ ", " ++ (show dest)
-emitASM (LabelDef lbl)             = Right $ "lbl" ++ ":"
+emitASM (LabelDef lbl)          = Right $ lbl ++ ":"
 emitASM (Rsp r@Reg{})           = Right $ "rsp " ++ (show r)
-emitASM (Call l@Label{})          = Right $ "call " ++ show l
+emitASM (Call l@Label{})        = Right $ "call " ++ show l
 emitASM Ret                     = Right "ret"
 emitASM Nop                     = Right "nop"
 emitASM instr = Left $ "Undefined Instruction: " ++ (show instr)
