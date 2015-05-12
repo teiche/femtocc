@@ -22,29 +22,27 @@ instance Show Operand where
     show (Label l) = l
     show (Plus r@Reg{} i@Imm{}) = "(" ++ (show r) ++ " + " ++ (show i) ++ ")"
 
+-- Comonly used registers                                  
 ret = Reg 0 -- Return Value
 cfp = Reg 1 -- Current frame pointer
 acc = Reg 2 -- Accumulator
 tmp = Reg 3 -- Temp
 
--- TODO: Rename to something less instruction-y
--- because this contains labels and directives as well
-
-data Instruction = Push Operand
-                 | Pop Operand
-                 | Add Operand Operand
-                 | Sub Operand Operand                   
-                 | Mov Operand Operand
-                 | Asp Operand
-                 | LabelDef String
-                 | Store Operand Operand
-                 | Rsp Operand
-                 | Wsp Operand
-                 | Call Operand
-                 | Brn Operand
-                 | Ret
-                 | Nop
-                 deriving Show
+data ASMStatement = Push Operand
+                  | Pop Operand
+                  | Add Operand Operand
+                  | Sub Operand Operand                   
+                  | Mov Operand Operand
+                  | Asp Operand
+                  | LabelDef String
+                  | Store Operand Operand
+                  | Rsp Operand
+                  | Wsp Operand
+                  | Call Operand
+                  | Brn Operand
+                  | Ret
+                  | Nop
+                  deriving Show
 
 ramEnd :: Int
 ramEnd = 0x8200
@@ -53,7 +51,7 @@ ramEnd = 0x8200
 -- Set up the stack and frame pointers
 -- Jump to main
 -- TODO: Handle this in the linking step
-crtm :: [Instruction]                          
+crtm :: [ASMStatement]                          
 crtm = [
   -- pad out the interrupt vectors with NOPs
   Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop,
@@ -66,7 +64,7 @@ crtm = [
   ]
                           
 -- Determine how much a single instruction changes the stack size
-stackChange :: Instruction -> Int
+stackChange :: ASMStatement -> Int
 stackChange Push{} = 1
 stackChange Pop{} = -1
 stackChange Call{} = 1
@@ -78,13 +76,13 @@ stackChange _ = 0
 -- list of instructions
 -- Positive values are the stack growing
 -- Negative values are the satck shrinking
-stackDelta :: [Instruction] -> Int
+stackDelta :: [ASMStatement] -> Int
 stackDelta = sum . (map stackChange)
 
 -- Push the accumulator onto the stack, making room for an expression to be evaluated
 pushDown = [Push acc]
 
-binOpFunc :: String -> Operand -> Operand -> Instruction           
+binOpFunc :: String -> Operand -> Operand -> ASMStatement           
 binOpFunc "+" = Add
 binOpFunc "-" = Sub
 binOpFunc x = error $ "Uncrecognized Operator: " ++ x                
@@ -98,20 +96,20 @@ exprSize VariableDecl{} = 1
 exprSize _ = 0
 
 -- Make room on the stack
-funcAlloc :: Expr -> [Instruction]
+funcAlloc :: Expr -> [ASMStatement]
 funcAlloc (FuncDef _ _ _  body) = [Asp ((Imm . negate . stackSize) body)]
              
-funcEntry :: Expr -> [Instruction]
+funcEntry :: Expr -> [ASMStatement]
 funcEntry f =
     [Push cfp, -- Save the current frame pointer
      Rsp cfp] ++  -- Calculate the new frame pointer
      funcAlloc f
 
 -- Pop the stack frame
-funcDealloc :: Expr -> [Instruction]
+funcDealloc :: Expr -> [ASMStatement]
 funcDealloc (FuncDef _ _ _ body) = [Asp ((Imm . stackSize) body)]
     
-funcExit :: Expr -> [Instruction]
+funcExit :: Expr -> [ASMStatement]
 funcExit f =
      funcDealloc f ++
     [Pop cfp,
@@ -121,10 +119,10 @@ funcExit f =
 argStackSize :: [Symbol] -> Int
 argStackSize args = length args
 
-codeGen :: Expr -> [Instruction]
+codeGen :: Expr -> [ASMStatement]
 codeGen expr = crtm ++ (codeGen' [] expr)
 
-codeGen' :: FrameOffsetTable -> Expr -> [Instruction]
+codeGen' :: FrameOffsetTable -> Expr -> [ASMStatement]
 codeGen' _   (Const v) = [Mov acc (Imm v)]
 codeGen' fot (BinOp "=" (Identifier dest) src) =
     (codeGen' fot src) ++
@@ -166,7 +164,7 @@ codeGen' fot f@(FuncCall name args) =
 codeGen' _ Pass = [Nop]
 codeGen' _ _ = []
 
-emitASM :: Instruction -> Either String String
+emitASM :: ASMStatement -> Either String String
 emitASM (Push r@Reg{}) = Right $ "push " ++ (show r)
 emitASM (Pop r@Reg{})  = Right $ "pop " ++ (show r)
 emitASM (Add rd@Reg{} rs@Reg{}) = Right $ "add " ++ (show rd) ++ ", " ++ (show rs)
@@ -182,6 +180,6 @@ emitASM (Call l@Label{})        = Right $ "call " ++ show l
 emitASM (Brn l@Label{})        = Right $ "brn " ++ show l
 emitASM Ret                     = Right "ret"
 emitASM Nop                     = Right "nop"
-emitASM instr = Left $ "Undefined Instruction: " ++ (show instr)
+emitASM instr = Left $ "Undefined ASMStatement: " ++ (show instr)
 
 compileAST = (fmap emitASM) . codeGen
