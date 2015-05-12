@@ -11,7 +11,6 @@ import FrameOffsetTable
     
 -- A backend using a stack machine execution model
 
-
 data Operand = Reg Int
              | Imm Int
              | Label String
@@ -40,16 +39,30 @@ data Instruction = Push Operand
                  | LabelDef String
                  | Store Operand Operand
                  | Rsp Operand
+                 | Wsp Operand
                  | Call Operand
+                 | Brn Operand
                  | Ret
                  | Nop
                  deriving Show
 
+ramEnd :: Int
+ramEnd = 0x8200
+                          
 -- C runtime
 -- Set up the stack and frame pointers
 -- Jump to main
+-- TODO: Handle this in the linking step
 crtm :: [Instruction]                          
 crtm = [
+  -- pad out the interrupt vectors with NOPs
+  Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop, Nop,
+  -- Set up the stack pointer
+  Mov tmp (Imm ramEnd),
+  Wsp tmp,
+  -- Initialize the frame pointer to main's frame
+  Mov cfp (Imm 0),
+  Brn (Label "main")
   ]
                           
 -- Determine how much a single instruction changes the stack size
@@ -109,7 +122,7 @@ argStackSize :: [Symbol] -> Int
 argStackSize args = length args
 
 codeGen :: Expr -> [Instruction]
-codeGen = codeGen' []
+codeGen expr = crtm ++ (codeGen' [] expr)
 
 codeGen' :: FrameOffsetTable -> Expr -> [Instruction]
 codeGen' _   (Const v) = [Mov acc (Imm v)]
@@ -164,7 +177,9 @@ emitASM (Store src@Reg{} dest@Reg{}) = Right $ "st " ++ (show src) ++ ", " ++ (s
 emitASM (Store src@Reg{} dest@(Plus Reg{} Imm{})) = Right $ "st " ++ (show src) ++ ", " ++ (show dest)
 emitASM (LabelDef lbl)          = Right $ lbl ++ ":"
 emitASM (Rsp r@Reg{})           = Right $ "rsp " ++ (show r)
+emitASM (Wsp r@Reg{})           = Right $ "wsp " ++ (show r)
 emitASM (Call l@Label{})        = Right $ "call " ++ show l
+emitASM (Brn l@Label{})        = Right $ "brn " ++ show l
 emitASM Ret                     = Right "ret"
 emitASM Nop                     = Right "nop"
 emitASM instr = Left $ "Undefined Instruction: " ++ (show instr)
